@@ -3,167 +3,81 @@ package com.teknoserval.worldwrapper;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.papermc.paper.entity.TeleportFlag;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Vehicle;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.spigotmc.event.entity.EntityMountEvent;
+import org.bukkit.scheduler.BukkitRunnable;
+
 
 public class EventListener implements Listener {
-
-	private static FileConfiguration config;
-	private static JavaPlugin plugin;
-
-	public static ArrayList<Entity> trackedEntities = new ArrayList<Entity>();
-
-	public static void init(FileConfiguration myConfig, JavaPlugin myPlugin) {
-
-		config = myConfig;
-		plugin = myPlugin;
-
-		trackedEntities = (ArrayList<Entity>) config.get("trackedEntities");
-
-		for (Entity entity : trackedEntities) {
-
-			if (!entity.isValid()) {
-
-				trackedEntities.remove(entity);
-
-			}
-
-		}
-
-	}
-
-	public static void shutdown() {
-
-		config.set("trackedEntities", trackedEntities);
-
-	}
 
 	@EventHandler
 	public void onPlayerMove(PlayerMoveEvent event) {
 
 		Player player = event.getPlayer();
+		if (WrapperUtil.needsWrapping(player)) {
 
-		if (!TickHandler.needsWrapping(player)) {
-
-			return;
-
-		}
-
-		Location loc = event.getTo();
-
-		Entity mount = player.getVehicle();
-
-		if (mount != null) {
-
-			if (mount.getType() == EntityType.HORSE || mount.getType() == EntityType.PIG) {
-
-				Location toLocation = mount.getLocation().subtract(loc);
-
-				VehicleMoveEvent newEvent = new VehicleMoveEvent((Vehicle) mount, mount.getLocation(),
-						wrapper(player.getLocation().add(toLocation)));
-
-				Bukkit.getPluginManager().callEvent(newEvent);
-
-			}
-
-			return;
-
-		}
-
-		event.setTo(wrapper(loc));
-
-	}
-
-	@EventHandler
-	public void onVehicleMove(VehicleMoveEvent event) {
-
-		Location loc = event.getTo();
-		Entity vehicle = event.getVehicle();
-
-		if (TickHandler.needsWrapping(vehicle)) {
-
-			List<Entity> passengers = new ArrayList<Entity>();
-
-			if (!vehicle.isEmpty()) {
-
-				passengers = vehicle.getPassengers();
-
-			}
-
-			for (Entity passenger : passengers) {
-
-				vehicle.removePassenger(passenger);
-
-			}
-
-			Location newLoc = wrapper(loc);
+			Location loc = event.getTo();
+			Location newLoc = WrapperUtil.wrapper(loc);
 
 			newLoc.getChunk().load();
 
-			vehicle.teleport(newLoc);
+			List<Entity> entities = player.getPassengers();
+			Entity vehicle = player.getVehicle();
 
-			Bukkit.getScheduler().scheduleSyncDelayedTask(plugin,
-					new PassengerTeleportRunnable(passengers, vehicle, plugin, newLoc), 2L);
 
+			// as of 1.21.11 TeleportFlag.EntityState.RETAIN_PASSENGERS is now standard behavior and can be removed if this plugin is ever updated to 1.21.11
+			player.teleportAsync(newLoc, PlayerTeleportEvent.TeleportCause.PLUGIN,
+					TeleportFlag.Relative.VELOCITY_X,
+					TeleportFlag.Relative.VELOCITY_Y,
+					TeleportFlag.Relative.VELOCITY_Z,
+					TeleportFlag.Relative.VELOCITY_ROTATION
+			).thenAccept(success -> { // loads chunks asynchronously and teleports the entity
+				// this code is ran when the teleport completes
+				// the Future is completed on the main thread, so it is safe to use the API here
+
+				if (success) {
+
+
+					if (vehicle != null){
+						vehicle.teleportAsync(newLoc);
+
+					}
+
+					new BukkitRunnable() {
+						@Override
+						public void run() {
+							if (vehicle != null){
+								vehicle.addPassenger(player);
+
+							}
+
+
+							for (Entity entity1 : entities){
+								player.addPassenger(entity1);
+							}
+
+							cancel();
+						}
+					}.runTaskTimer(WorldWrapper.getInstance(), 1, 1);
+
+
+
+
+
+				}
+			});
 		}
-
 	}
 
-	@EventHandler
-	public void onEntityMount(EntityMountEvent event) {
-
-		if (!(event.getEntity() instanceof Player)) {
-
-			Entity mount = event.getMount();
-			trackedEntities.add(mount);
-
-			Entity rider = event.getEntity();
-			trackedEntities.add(rider);
-		}
-
-	}
-
-	public static Location wrapper(Location loc) {
-
-		if (config.getBoolean("wrapNorthSouth")) {
-			if (loc.getZ() > config.getInt("worldEdgeSouth")) {
-
-				loc.setZ(config.getInt("worldEdgeNorth") + 1);
-
-			} else if (loc.getZ() < config.getInt("worldEdgeNorth")) {
-
-				loc.setZ(config.getInt("worldEdgeSouth") - 1);
-
-			}
-		}
-
-		if (config.getBoolean("wrapEastWest")) {
-			if (loc.getX() > config.getInt("worldEdgeEast")) {
-
-				loc.setX(config.getInt("worldEdgeWest") + 1);
-
-			} else if (loc.getX() < config.getInt("worldEdgeWest")) {
-
-				loc.setX(config.getInt("worldEdgeEast") - 1);
-
-			}
-		}
-
-		loc.setY(loc.getWorld().getHighestBlockYAt(loc) + 1);
-
-		return loc;
-
-	}
 
 }

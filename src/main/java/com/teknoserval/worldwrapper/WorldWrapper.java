@@ -1,39 +1,33 @@
 package com.teknoserval.worldwrapper;
 
+import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Entity;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class WorldWrapper extends JavaPlugin {
 
-	private FileConfiguration config;
-	
-	
 	@Override
 	public void onEnable() {
-		
-		this.getCommand("basic").setExecutor(new CommandExecuter(this));
+
 		
 		getServer().getPluginManager().registerEvents(new EventListener(), this);
-		
-		
-		config = this.getConfig();
-		ConfigHandler.init(config);
-		saveConfig();
-		
-		EventListener.init(config, this);
-		
-		TickHandler.init(this, config);
+
+
+		saveDefaultConfig();
 		
 	}
 	
 	@Override
 	public void onDisable() {
 		
-		EventListener.shutdown();
-		
-		saveConfig();
-		
 	}
+
+	public static WorldWrapper getInstance() {
+		return getPlugin(WorldWrapper.class);
+	}
+
+
 	
 	
 

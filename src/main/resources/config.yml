@@ -1,0 +1,6 @@
+worldEdgeNorth: -30000000
+worldEdgeSouth: 30000000
+worldEdgeEast: 30000000
+worldEdgeWest: -30000000
+wrapNorthSouth: true
+wrapEastWest: true

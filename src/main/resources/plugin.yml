@@ -1,10 +1,11 @@
 name: WorldWrapper
 main: com.teknoserval.worldwrapper.WorldWrapper
-version: 1.2.1
+version: '1.2.2'
+api-version: '1.21'
 author: TeknoServal
 commands:
-  basic:
-    description: This is a demo command.
-    usage: /basic [player]
-    permission: WorldWrapper.basic
-    permission-message: You don't have basic permissions.
+  worldwrapper:
+    description: options for the worldwrapper plugin
+    usage: /worldwrapper []
+    permission: WorldWrapper.command
+    permission-message: You don't have permission to use this command.
